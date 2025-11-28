@@ -1,0 +1,198 @@
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../lib/api';
+
+export default function Dashboard() {
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ['graph-stats'],
+    queryFn: () => api.graph.stats(),
+  });
+
+  const { data: papersData } = useQuery({
+    queryKey: ['papers', 10, 0],
+    queryFn: () => api.papers.list(10, 0),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <div className="absolute inset-0 animate-ping rounded-full h-16 w-16 border-2 border-blue-400 opacity-20 mx-auto"></div>
+          </div>
+          <p className="text-gray-600 font-medium">Loading dashboard...</p>
+          <p className="text-gray-400 text-sm mt-1">Fetching your knowledge graph data</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8 animate-fadeIn">
+      {/* Header Section */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+            Dashboard
+          </h1>
+          <p className="text-sm text-gray-500 mt-2 flex items-center space-x-2">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+            <span>Monitor your knowledge graph metrics and recent activity</span>
+          </p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 flex items-center space-x-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="group bg-white rounded-2xl border border-gray-200/60 p-6 hover:shadow-xl hover:shadow-blue-100/50 hover:border-blue-300/50 transition-all duration-300 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full -mr-16 -mt-16"></div>
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+              </div>
+              <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Active</span>
+            </div>
+            <p className="text-sm font-medium text-gray-500 mb-1">Total Nodes</p>
+            <p className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
+              {stats?.nodes.total || 0}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">Entities in your graph</p>
+          </div>
+        </div>
+
+        <div className="group bg-white rounded-2xl border border-gray-200/60 p-6 hover:shadow-xl hover:shadow-purple-100/50 hover:border-purple-300/50 transition-all duration-300 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full -mr-16 -mt-16"></div>
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+              </div>
+              <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-3 py-1 rounded-full">Connected</span>
+            </div>
+            <p className="text-sm font-medium text-gray-500 mb-1">Total Edges</p>
+            <p className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent">
+              {stats?.edges.total || 0}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">Relationships mapped</p>
+          </div>
+        </div>
+
+        <div className="group bg-white rounded-2xl border border-gray-200/60 p-6 hover:shadow-xl hover:shadow-emerald-100/50 hover:border-emerald-300/50 transition-all duration-300 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full -mr-16 -mt-16"></div>
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">Growing</span>
+            </div>
+            <p className="text-sm font-medium text-gray-500 mb-1">Total Papers</p>
+            <p className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-700 bg-clip-text text-transparent">
+              {papersData?.papers.length || 0}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">Research papers indexed</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {stats?.nodes.byType && stats.nodes.byType.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Node Distribution</h2>
+            <div className="space-y-3">
+              {stats.nodes.byType.map((item) => {
+                const percentage = ((item.count / (stats.nodes.total || 1)) * 100).toFixed(1);
+                return (
+                  <div key={item.type} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-gray-700 capitalize">{item.type}</span>
+                      <span className="text-gray-600">{item.count} ({percentage}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {stats?.edges.byType && stats.edges.byType.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Edge Distribution</h2>
+            <div className="space-y-3">
+              {stats.edges.byType.map((item) => {
+                const percentage = ((item.count / (stats.edges.total || 1)) * 100).toFixed(1);
+                return (
+                  <div key={item.type} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-gray-700 capitalize">{item.type.replace(/_/g, ' ')}</span>
+                      <span className="text-gray-600">{item.count} ({percentage}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {papersData?.papers && papersData.papers.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Papers</h2>
+          <div className="space-y-3">
+            {papersData.papers.map((paper) => (
+              <div
+                key={paper.id}
+                className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
+              >
+                <h3 className="font-medium text-gray-900 text-sm mb-2">{paper.title}</h3>
+                <div className="flex items-center gap-3 flex-wrap">
+                  {paper.arxivId && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                      arXiv: {paper.arxivId}
+                    </span>
+                  )}
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium ${
+                      paper.processed
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}
+                  >
+                    {paper.processed ? '✓ Processed' : '⏳ Pending'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

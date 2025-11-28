@@ -1,0 +1,19 @@
+{
+  "name": "gsplat-kg",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Knowledge graph application for Gaussian Splatting research papers",
+  "scripts": {
+    "dev": "pnpm --parallel --filter api --filter web dev",
+    "build": "pnpm --filter api build && pnpm --filter web build",
+    "db:push": "pnpm --filter api db:push",
+    "db:studio": "pnpm --filter api db:studio"
+  },
+  "keywords": ["knowledge-graph", "ai-agents", "gaussian-splatting"],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

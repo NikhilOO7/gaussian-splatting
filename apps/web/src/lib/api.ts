@@ -1,0 +1,83 @@
+import type { Paper, Node, Edge, GraphStats, Subgraph } from 'shared';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export const api = {
+  papers: {
+    list: (limit = 20, offset = 0) =>
+      fetchAPI<{ papers: Paper[]; pagination: { limit: number; offset: number } }>(
+        `/api/papers?limit=${limit}&offset=${offset}`
+      ),
+    get: (id: string) => fetchAPI<Paper>(`/api/papers/${id}`),
+    create: (data: Partial<Paper>) =>
+      fetchAPI<Paper>('/api/papers', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    process: (id: string) =>
+      fetchAPI<{ message: string; paperId: string; status: string }>(
+        `/api/papers/${id}/process`,
+        { method: 'POST' }
+      ),
+  },
+
+  graph: {
+    nodes: (params?: { type?: string; search?: string; limit?: number; offset?: number }) => {
+      const queryParams = new URLSearchParams();
+      if (params?.type) queryParams.set('type', params.type);
+      if (params?.search) queryParams.set('search', params.search);
+      if (params?.limit) queryParams.set('limit', params.limit.toString());
+      if (params?.offset) queryParams.set('offset', params.offset.toString());
+
+      return fetchAPI<{ nodes: Node[]; pagination: { limit: number; offset: number } }>(
+        `/api/graph/nodes?${queryParams}`
+      );
+    },
+    node: (id: string) =>
+      fetchAPI<{ node: Node; outgoingEdges: Edge[]; incomingEdges: Edge[] }>(
+        `/api/graph/nodes/${id}`
+      ),
+    edges: (params?: { type?: string; limit?: number; offset?: number }) => {
+      const queryParams = new URLSearchParams();
+      if (params?.type) queryParams.set('type', params.type);
+      if (params?.limit) queryParams.set('limit', params.limit.toString());
+      if (params?.offset) queryParams.set('offset', params.offset.toString());
+
+      return fetchAPI<{ edges: Edge[]; pagination: { limit: number; offset: number } }>(
+        `/api/graph/edges?${queryParams}`
+      );
+    },
+    subgraph: (nodeId: string, depth = 1) =>
+      fetchAPI<Subgraph>(`/api/graph/subgraph?nodeId=${nodeId}&depth=${depth}`),
+    stats: () => fetchAPI<GraphStats>('/api/graph/stats'),
+  },
+
+  ingest: {
+    arxiv: (arxivId: string) =>
+      fetchAPI<{ jobId: string; status: string }>('/api/ingest/arxiv', {
+        method: 'POST',
+        body: JSON.stringify({ arxivId }),
+      }),
+    status: (jobId: string) =>
+      fetchAPI<{ status: string; paperId?: string; error?: string }>(
+        `/api/ingest/status/${jobId}`
+      ),
+  },
+};

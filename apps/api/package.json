@@ -1,0 +1,30 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "ai": "latest",
+    "drizzle-orm": "latest",
+    "hono": "latest",
+    "ollama-ai-provider": "latest",
+    "pdf-parse": "latest",
+    "postgres": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/pdf-parse": "latest",
+    "drizzle-kit": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}
