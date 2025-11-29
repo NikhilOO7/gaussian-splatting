@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../db';
 import { papers } from '../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, inArray } from 'drizzle-orm';
 import { processPaper } from '../pipeline/processor';
 
 export const papersRouter = new Hono();
@@ -25,6 +25,31 @@ papersRouter.get('/', async (c) => {
   } catch (error) {
     console.error('Error fetching papers:', error);
     return c.json({ error: 'Failed to fetch papers' }, 500);
+  }
+});
+
+papersRouter.get('/processing', async (c) => {
+  try {
+    const processingPapers = await db
+      .select()
+      .from(papers)
+      .where(
+        inArray(papers.processingStatus, [
+          'pending',
+          'downloading_pdf',
+          'extracting_text',
+          'chunking',
+          'extracting_entities',
+          'resolving_entities',
+          'validating'
+        ])
+      )
+      .orderBy(desc(papers.createdAt));
+
+    return c.json({ papers: processingPapers });
+  } catch (error) {
+    console.error('Error fetching processing papers:', error);
+    return c.json({ error: 'Failed to fetch processing papers' }, 500);
   }
 });
 

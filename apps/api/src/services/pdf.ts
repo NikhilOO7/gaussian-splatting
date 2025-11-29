@@ -1,4 +1,4 @@
-import pdfParse from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 
 export interface PDFContent {
   text: string;
@@ -8,14 +8,18 @@ export interface PDFContent {
 
 export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<PDFContent> {
   try {
-    const data = await pdfParse(pdfBuffer);
+    const parser = new PDFParse({ data: pdfBuffer });
+    const textResult = await parser.getText();
+    const infoResult = await parser.getInfo();
 
-    const cleanedText = cleanExtractedText(data.text);
+    const cleanedText = cleanExtractedText(textResult.text);
+
+    await parser.destroy();
 
     return {
       text: cleanedText,
-      numPages: data.numpages,
-      info: data.info,
+      numPages: textResult.pages.length,
+      info: infoResult.info,
     };
   } catch (error) {
     console.error('Error extracting text from PDF:', error);

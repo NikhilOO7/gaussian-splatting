@@ -12,6 +12,12 @@ export default function Dashboard() {
     queryFn: () => api.papers.list(10, 0),
   });
 
+  const { data: processingPapers } = useQuery({
+    queryKey: ['processing-papers'],
+    queryFn: () => api.papers.processing(),
+    refetchInterval: 2000,
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -109,6 +115,86 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Processing Papers Section */}
+      {processingPapers && processingPapers.papers.length > 0 && (
+        <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border-2 border-orange-200/60 p-6 shadow-lg">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/30">
+              <svg className="w-6 h-6 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Processing Papers</h2>
+              <p className="text-sm text-gray-600">{processingPapers.papers.length} paper{processingPapers.papers.length !== 1 ? 's' : ''} currently being processed</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {processingPapers.papers.map((paper) => {
+              const statusConfig: Record<string, { color: string; label: string; progress: number; icon: string }> = {
+                pending: { color: 'gray', label: 'Pending', progress: 0, icon: '⏳' },
+                downloading_pdf: { color: 'blue', label: 'Downloading PDF', progress: 15, icon: '⬇️' },
+                extracting_text: { color: 'indigo', label: 'Extracting Text', progress: 30, icon: '📄' },
+                chunking: { color: 'purple', label: 'Chunking', progress: 45, icon: '✂️' },
+                extracting_entities: { color: 'pink', label: 'Extracting Entities', progress: 60, icon: '🔍' },
+                resolving_entities: { color: 'rose', label: 'Resolving Entities', progress: 75, icon: '🔗' },
+                validating: { color: 'orange', label: 'Validating', progress: 90, icon: '✅' },
+                completed: { color: 'green', label: 'Completed', progress: 100, icon: '✓' },
+                failed: { color: 'red', label: 'Failed', progress: 0, icon: '✗' }
+              };
+
+              const status = statusConfig[paper.processingStatus] || statusConfig.pending;
+
+              return (
+                <div key={paper.id} className="bg-white rounded-xl border border-orange-200/60 p-5 hover:shadow-md transition-all duration-200">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">{paper.title}</h3>
+                      {paper.arxivId && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                          arXiv: {paper.arxivId}
+                        </span>
+                      )}
+                    </div>
+                    <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold ml-3 flex-shrink-0 bg-${status.color}-100 text-${status.color}-800 border-2 border-${status.color}-200`}>
+                      <span>{status.icon}</span>
+                      <span>{status.label}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600 font-medium">Progress</span>
+                      <span className="text-gray-900 font-bold">{paper.processingProgress || status.progress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className={`h-2.5 rounded-full transition-all duration-500 ease-out bg-gradient-to-r from-${status.color}-500 to-${status.color}-600`}
+                        style={{ width: `${paper.processingProgress || status.progress}%` }}
+                      >
+                        <div className="h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {paper.processingError && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-xs text-red-800 font-medium flex items-center space-x-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{paper.processingError}</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {stats?.nodes.byType && stats.nodes.byType.length > 0 && (

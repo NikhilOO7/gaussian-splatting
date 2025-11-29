@@ -25,6 +25,8 @@ export const api = {
       fetchAPI<{ papers: Paper[]; pagination: { limit: number; offset: number } }>(
         `/api/papers?limit=${limit}&offset=${offset}`
       ),
+    processing: () =>
+      fetchAPI<{ papers: Paper[] }>('/api/papers/processing'),
     get: (id: string) => fetchAPI<Paper>(`/api/papers/${id}`),
     create: (data: Partial<Paper>) =>
       fetchAPI<Paper>('/api/papers', {

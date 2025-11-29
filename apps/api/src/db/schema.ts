@@ -14,6 +14,18 @@ export const edgeTypeEnum = pgEnum('edge_type', [
   'authored_by'
 ]);
 
+export const processingStatusEnum = pgEnum('processing_status', [
+  'pending',
+  'downloading_pdf',
+  'extracting_text',
+  'chunking',
+  'extracting_entities',
+  'resolving_entities',
+  'validating',
+  'completed',
+  'failed'
+]);
+
 export const papers = pgTable('papers', {
   id: uuid('id').defaultRandom().primaryKey(),
   title: text('title').notNull(),
@@ -25,11 +37,15 @@ export const papers = pgTable('papers', {
   venue: text('venue'),
   rawText: text('raw_text'),
   processed: boolean('processed').default(false).notNull(),
+  processingStatus: processingStatusEnum('processing_status').default('pending').notNull(),
+  processingProgress: integer('processing_progress').default(0),
+  processingError: text('processing_error'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   arxivIdIdx: index('papers_arxiv_id_idx').on(table.arxivId),
   processedIdx: index('papers_processed_idx').on(table.processed),
+  processingStatusIdx: index('papers_processing_status_idx').on(table.processingStatus),
 }));
 
 export const authors = pgTable('authors', {

@@ -1,14 +1,25 @@
 export type NodeType = 'paper' | 'method' | 'concept' | 'dataset' | 'metric';
 
-export type EdgeType = 
-  | 'extends' 
-  | 'improves' 
-  | 'uses' 
-  | 'introduces' 
-  | 'cites' 
-  | 'evaluates_on' 
-  | 'compares_to' 
+export type EdgeType =
+  | 'extends'
+  | 'improves'
+  | 'uses'
+  | 'introduces'
+  | 'cites'
+  | 'evaluates_on'
+  | 'compares_to'
   | 'authored_by';
+
+export type ProcessingStatus =
+  | 'pending'
+  | 'downloading_pdf'
+  | 'extracting_text'
+  | 'chunking'
+  | 'extracting_entities'
+  | 'resolving_entities'
+  | 'validating'
+  | 'completed'
+  | 'failed';
 
 export interface Paper {
   id: string;
@@ -21,6 +32,9 @@ export interface Paper {
   venue: string | null;
   rawText: string | null;
   processed: boolean;
+  processingStatus: ProcessingStatus;
+  processingProgress: number | null;
+  processingError: string | null;
   createdAt: string;
   updatedAt: string;
 }

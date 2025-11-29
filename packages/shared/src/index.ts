@@ -10,6 +10,17 @@ export type EdgeType =
   | 'compares_to'
   | 'authored_by';
 
+export type ProcessingStatus =
+  | 'pending'
+  | 'downloading_pdf'
+  | 'extracting_text'
+  | 'chunking'
+  | 'extracting_entities'
+  | 'resolving_entities'
+  | 'validating'
+  | 'completed'
+  | 'failed';
+
 export interface Paper {
   id: string;
   title: string;
@@ -21,6 +32,9 @@ export interface Paper {
   venue?: string;
   rawText?: string;
   processed: boolean;
+  processingStatus: ProcessingStatus;
+  processingProgress?: number | null;
+  processingError?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
