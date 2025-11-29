@@ -352,3 +352,238 @@ pnpm dev
 ## License
 
 MIT
+
+
+## Example Queries
+
+The knowledge graph supports semantic queries through dedicated API endpoints. Here are examples demonstrating the graph's capabilities:
+
+### 1. Find Papers That Improve on 3D Gaussian Splatting
+
+```bash
+GET /api/graph/queries/improves-3dgs
+```
+
+Response:
+```json
+{
+  "query": "Which methods improve on 3D Gaussian Splatting?",
+  "results": [
+    {
+      "sourceName": "Mip-Splatting",
+      "sourceType": "method",
+      "relationship": "improves",
+      "confidence": "0.85",
+      "targetName": "3D Gaussian Splatting"
+    },
+    {
+      "sourceName": "Scaffold-GS",
+      "sourceType": "method", 
+      "relationship": "improves",
+      "confidence": "0.90",
+      "targetName": "3D Gaussian Splatting"
+    }
+  ],
+  "count": 2
+}
+```
+
+### 2. Find Papers That Extend the Original 3DGS Method
+
+```bash
+GET /api/graph/queries/extends-3dgs
+```
+
+This query finds all methods that explicitly extend or build upon the original Gaussian Splatting approach.
+
+### 3. Find Datasets Used for Evaluation
+
+```bash
+GET /api/graph/queries/datasets
+```
+
+Returns all dataset nodes and which methods evaluated on them:
+```json
+{
+  "query": "Which datasets are used for evaluation?",
+  "results": [
+    {
+      "dataset": "Mip-NeRF360",
+      "usedBy": "3D Gaussian Splatting",
+      "confidence": "0.95"
+    },
+    {
+      "dataset": "Tanks and Temples",
+      "usedBy": "Scaffold-GS",
+      "confidence": "0.88"
+    }
+  ]
+}
+```
+
+### 4. Find All Relationships for a Specific Method
+
+```bash
+GET /api/graph/queries/method-relationships?name=Gaussian
+```
+
+Returns both incoming and outgoing relationships for methods matching the search term.
+
+### 5. Get Provenance for a Relationship
+
+```bash
+GET /api/graph/queries/provenance/:edgeId
+```
+
+Returns the source evidence for any extracted relationship:
+```json
+{
+  "edge": {
+    "id": "uuid",
+    "sourceId": "...",
+    "targetId": "...",
+    "type": "improves",
+    "confidence": "0.85"
+  },
+  "sourceNode": { "name": "Mip-Splatting", "type": "method" },
+  "targetNode": { "name": "3D Gaussian Splatting", "type": "method" },
+  "provenance": [
+    {
+      "paperTitle": "Mip-Splatting: Alias-free 3D Gaussian Splatting",
+      "paperArxivId": "2311.16493",
+      "section": "abstract",
+      "extractedText": "We present Mip-Splatting, which addresses aliasing artifacts in 3D Gaussian Splatting..."
+    }
+  ]
+}
+```
+
+### 6. Get N-Hop Subgraph
+
+```bash
+GET /api/graph/subgraph?nodeId=<uuid>&depth=2
+```
+
+Returns all nodes and edges within N hops of a center node, useful for exploring local neighborhoods in the graph.
+
+### Raw SQL Examples
+
+For direct database access, here are equivalent SQL queries:
+
+**Papers improving on 3DGS:**
+```sql
+SELECT 
+  source_nodes.name as improving_method,
+  edges.confidence,
+  papers.title as source_paper
+FROM edges
+JOIN nodes source_nodes ON edges.source_id = source_nodes.id
+JOIN nodes target_nodes ON edges.target_id = target_nodes.id
+LEFT JOIN papers ON source_nodes.paper_id = papers.id
+WHERE target_nodes.name ILIKE '%Gaussian Splatting%'
+  AND edges.type = 'improves'
+ORDER BY edges.confidence DESC;
+```
+
+**Methods and their datasets:**
+```sql
+SELECT 
+  method_nodes.name as method,
+  dataset_nodes.name as dataset,
+  edges.confidence
+FROM edges
+JOIN nodes method_nodes ON edges.source_id = method_nodes.id
+JOIN nodes dataset_nodes ON edges.target_id = dataset_nodes.id
+WHERE edges.type = 'evaluates_on'
+  AND dataset_nodes.type = 'dataset'
+ORDER BY method_nodes.name;
+```
+
+**Find all relationships for a concept:**
+```sql
+WITH target_concept AS (
+  SELECT id FROM nodes WHERE name ILIKE '%novel view synthesis%'
+)
+SELECT 
+  'outgoing' as direction,
+  n.name as related_entity,
+  e.type as relationship,
+  e.confidence
+FROM edges e
+JOIN nodes n ON e.target_id = n.id
+WHERE e.source_id IN (SELECT id FROM target_concept)
+
+UNION ALL
+
+SELECT 
+  'incoming' as direction,
+  n.name as related_entity,
+  e.type as relationship,
+  e.confidence
+FROM edges e
+JOIN nodes n ON e.source_id = n.id
+WHERE e.target_id IN (SELECT id FROM target_concept);
+```
+
+---
+
+## Processing Papers
+
+### Single Paper Processing
+
+```bash
+# 1. Ingest paper from arXiv
+curl -X POST http://localhost:3000/api/ingest/arxiv \
+  -H "Content-Type: application/json" \
+  -d '{"arxivId": "2308.04079", "autoProcess": true}'
+
+# 2. Check job status
+curl http://localhost:3000/api/ingest/status/<jobId>
+
+# 3. Or manually trigger processing
+curl -X POST http://localhost:3000/api/papers/<paperId>/process
+```
+
+### Bulk Processing
+
+```bash
+# Ingest multiple papers
+curl -X POST http://localhost:3000/api/ingest/bulk \
+  -H "Content-Type: application/json" \
+  -d '{
+    "arxivIds": ["2308.04079", "2311.16493", "2312.02126"],
+    "autoProcess": true
+  }'
+```
+
+### Seed Dataset
+
+Get a curated list of Gaussian Splatting papers to ingest:
+
+```bash
+curl http://localhost:3000/api/ingest/seed/gaussian-splatting
+```
+
+---
+
+## API Endpoints Summary
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/papers` | GET | List all papers |
+| `/api/papers/:id` | GET | Get paper details |
+| `/api/papers/:id/process` | POST | Process paper through AI pipeline |
+| `/api/graph/nodes` | GET | List nodes with filters |
+| `/api/graph/nodes/:id` | GET | Get node with relationships |
+| `/api/graph/edges` | GET | List edges with filters |
+| `/api/graph/subgraph` | GET | Get N-hop neighborhood |
+| `/api/graph/stats` | GET | Get graph statistics |
+| `/api/graph/queries/improves-3dgs` | GET | Papers improving on 3DGS |
+| `/api/graph/queries/extends-3dgs` | GET | Papers extending 3DGS |
+| `/api/graph/queries/datasets` | GET | Datasets and their usage |
+| `/api/graph/queries/method-relationships` | GET | Relationships for a method |
+| `/api/graph/queries/provenance/:edgeId` | GET | Evidence for a relationship |
+| `/api/ingest/arxiv` | POST | Ingest paper from arXiv |
+| `/api/ingest/bulk` | POST | Bulk ingest papers |
+| `/api/ingest/status/:jobId` | GET | Check ingestion status |
+| `/api/ingest/seed/gaussian-splatting` | GET | Get seed paper IDs |
