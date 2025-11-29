@@ -39,6 +39,11 @@ export async function generateCompletion(
     };
   } catch (error) {
     console.error('Error generating completion:', error);
+    
+    if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
+      throw new Error('Ollama server not running. Start it with: ollama serve');
+    }
+    
     throw new Error(`Failed to generate completion: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -47,24 +52,123 @@ export async function generateStructuredCompletion<T>(
   systemPrompt: string,
   userPrompt: string,
   schema: any,
-  temperature: number = 0.7
+  temperature: number = 0.7,
+  retries: number = 2
 ): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const enhancedSystemPrompt = systemPrompt + `
+
+CRITICAL: Your response must be ONLY valid JSON. No markdown, no explanations, no text before or after the JSON.
+Start your response with { and end with }. Do not use \`\`\`json or any other formatting.`;
+
+      const result = await generateCompletion(enhancedSystemPrompt, userPrompt, temperature);
+      
+      const parsed = parseJSONResponse<T>(result.text);
+      return parsed;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`Attempt ${attempt}/${retries} failed:`, lastError.message);
+      
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+
+  console.error('All attempts failed, returning empty result');
+  return getEmptyResult<T>();
+}
+
+function parseJSONResponse<T>(text: string): T {
+  const jsonPatterns = [
+    /```json\s*([\s\S]*?)\s*```/,
+    /```\s*([\s\S]*?)\s*```/,
+    /(\{[\s\S]*\})/,
+    /(\[[\s\S]*\])/,
+  ];
+
+  let jsonText = text.trim();
+
+  for (const pattern of jsonPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      jsonText = match[1].trim();
+      break;
+    }
+  }
+
+  jsonText = jsonText
+    .replace(/,\s*}/g, '}')
+    .replace(/,\s*]/g, ']')
+    .replace(/\n/g, ' ')
+    .replace(/\r/g, '')
+    .replace(/\t/g, ' ');
+
+  jsonText = jsonText.replace(/[\x00-\x1F\x7F]/g, ' ');
+
   try {
-    const result = await generateCompletion(systemPrompt, userPrompt, temperature);
-
-    const jsonMatch = result.text.match(/```json\s*([\s\S]*?)\s*```/) ||
-                     result.text.match(/\{[\s\S]*\}/);
-
-    if (!jsonMatch) {
-      throw new Error('No JSON found in response');
+    return JSON.parse(jsonText) as T;
+  } catch (e) {
+    const objectMatch = jsonText.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+    if (objectMatch) {
+      try {
+        return JSON.parse(objectMatch[0]) as T;
+      } catch (e2) {
+      }
     }
 
-    const jsonText = jsonMatch[1] || jsonMatch[0];
-    const parsed = JSON.parse(jsonText);
+    throw new Error(`Failed to parse JSON: ${e instanceof Error ? e.message : 'Unknown error'}`);
+  }
+}
 
-    return parsed as T;
+function getEmptyResult<T>(): T {
+  return {
+    entities: [],
+    relationships: [],
+    resolvedEntities: [],
+    resolvedRelationships: [],
+    accepted: [],
+    rejected: [],
+    confidenceAdjustments: [],
+  } as unknown as T;
+}
+
+export async function checkOllamaConnection(): Promise<boolean> {
+  try {
+    const response = await fetch(`${baseURL}/api/tags`);
+    if (!response.ok) {
+      return false;
+    }
+    
+    const data = await response.json();
+    const hasModel = data.models?.some((m: any) => 
+      m.name === model || m.name.startsWith(model.split(':')[0])
+    );
+    
+    if (!hasModel) {
+      console.warn(`Model ${model} not found. Available models:`, 
+        data.models?.map((m: any) => m.name).join(', '));
+    }
+    
+    return true;
   } catch (error) {
-    console.error('Error generating structured completion:', error);
-    throw new Error(`Failed to generate structured completion: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return false;
+  }
+}
+
+export async function warmupModel(): Promise<void> {
+  console.log('Warming up Ollama model...');
+  try {
+    await generateCompletion(
+      'You are a helpful assistant.',
+      'Say "ready" in one word.',
+      0.1
+    );
+    console.log('Ollama model warmed up successfully');
+  } catch (error) {
+    console.error('Failed to warm up model:', error);
   }
 }

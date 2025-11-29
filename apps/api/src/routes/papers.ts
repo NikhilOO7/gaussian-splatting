@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db } from '../db';
 import { papers } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
+import { processPaper } from '../pipeline/processor';
 
 export const papersRouter = new Hono();
 
@@ -51,7 +52,7 @@ papersRouter.get('/:id', async (c) => {
 papersRouter.post('/', async (c) => {
   try {
     const body = await c.req.json();
-    const { title, abstract, arxivId, doi, pdfUrl, publicationDate, venue } = body;
+    const { title, abstract, arxivId, doi, pdfUrl, publicationDate, venue, rawText } = body;
 
     if (!title) {
       return c.json({ error: 'Title is required' }, 400);
@@ -67,6 +68,7 @@ papersRouter.post('/', async (c) => {
         pdfUrl,
         publicationDate,
         venue,
+        rawText,
       })
       .returning();
 
@@ -81,23 +83,45 @@ papersRouter.post('/:id/process', async (c) => {
   try {
     const id = c.req.param('id');
 
-    const paper = await db
+    const [paper] = await db
       .select()
       .from(papers)
       .where(eq(papers.id, id))
       .limit(1);
 
-    if (!paper.length) {
+    if (!paper) {
       return c.json({ error: 'Paper not found' }, 404);
     }
 
+    if (!paper.rawText) {
+      return c.json({ 
+        error: 'Paper has no text content. Please ingest the PDF first.',
+        paperId: id 
+      }, 400);
+    }
+
+    if (paper.processed) {
+      return c.json({
+        message: 'Paper already processed',
+        paperId: id,
+        status: 'already_processed'
+      });
+    }
+
+    console.log(`Starting processing for paper: ${paper.title}`);
+    
+    await processPaper(id);
+
     return c.json({
-      message: 'Processing started',
+      message: 'Processing complete',
       paperId: id,
-      status: 'queued'
+      status: 'completed'
     });
   } catch (error) {
     console.error('Error processing paper:', error);
-    return c.json({ error: 'Failed to start processing' }, 500);
+    return c.json({ 
+      error: 'Failed to process paper',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
   }
 });

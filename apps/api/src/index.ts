@@ -5,6 +5,7 @@ import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import { papersRouter } from './routes/papers';
 import { graphRouter } from './routes/graph';
 import { ingestRouter } from './routes/ingest';
+import { checkOllamaConnection, warmupModel } from './services/ollama';
 
 const app = new Hono();
 
@@ -14,48 +15,122 @@ app.use('*', cors({
   credentials: true,
 }));
 
-app.get('/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (c) => {
+  const ollamaConnected = await checkOllamaConnection();
+  
+  return c.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    services: {
+      ollama: ollamaConnected ? 'connected' : 'disconnected',
+    }
+  });
+});
+
+app.get('/', (c) => {
+  return c.json({
+    name: 'Gaussian Splatting Knowledge Graph API',
+    version: '1.0.0',
+    endpoints: {
+      health: 'GET /health',
+      papers: {
+        list: 'GET /api/papers',
+        get: 'GET /api/papers/:id',
+        create: 'POST /api/papers',
+        process: 'POST /api/papers/:id/process',
+      },
+      graph: {
+        nodes: 'GET /api/graph/nodes',
+        node: 'GET /api/graph/nodes/:id',
+        edges: 'GET /api/graph/edges',
+        subgraph: 'GET /api/graph/subgraph?nodeId=X&depth=N',
+        stats: 'GET /api/graph/stats',
+        queries: {
+          improves3dgs: 'GET /api/graph/queries/improves-3dgs',
+          extends3dgs: 'GET /api/graph/queries/extends-3dgs',
+          datasets: 'GET /api/graph/queries/datasets',
+          methodRelationships: 'GET /api/graph/queries/method-relationships?name=X',
+          provenance: 'GET /api/graph/queries/provenance/:edgeId',
+        }
+      },
+      ingest: {
+        arxiv: 'POST /api/ingest/arxiv',
+        bulk: 'POST /api/ingest/bulk',
+        status: 'GET /api/ingest/status/:jobId',
+        seed: 'GET /api/ingest/seed/gaussian-splatting',
+      }
+    }
+  });
 });
 
 app.route('/api/papers', papersRouter);
 app.route('/api/graph', graphRouter);
 app.route('/api/ingest', ingestRouter);
 
+app.notFound((c) => {
+  return c.json({ error: 'Not found', path: c.req.path }, 404);
+});
+
+app.onError((err, c) => {
+  console.error('Unhandled error:', err);
+  return c.json({ error: 'Internal server error', message: err.message }, 500);
+});
+
 const port = parseInt(process.env.PORT || '3000');
 
-console.log(`Server starting on http://localhost:${port}`);
+async function startServer() {
+  console.log('\n========================================');
+  console.log('  Gaussian Splatting Knowledge Graph');
+  console.log('========================================\n');
 
-const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-  const url = `http://${req.headers.host}${req.url}`;
-  const method = req.method || 'GET';
-
-  let body: ArrayBuffer | undefined;
-  if (method !== 'GET' && method !== 'HEAD') {
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
-    body = Buffer.concat(chunks).buffer;
+  console.log('Checking services...');
+  
+  const ollamaConnected = await checkOllamaConnection();
+  if (ollamaConnected) {
+    console.log('✓ Ollama: Connected');
+    await warmupModel();
+  } else {
+    console.log('✗ Ollama: Not connected');
+    console.log('  → Start Ollama with: ollama serve');
+    console.log('  → Pull model with: ollama pull llama3.1:8b');
+    console.log('  → The API will still work, but processing will fail\n');
   }
 
-  const request = new Request(url, {
-    method,
-    headers: req.headers as Record<string, string>,
-    body: body ? body : undefined,
+  const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    const url = `http://${req.headers.host}${req.url}`;
+    const method = req.method || 'GET';
+
+    let body: ArrayBuffer | undefined;
+    if (method !== 'GET' && method !== 'HEAD') {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      body = Buffer.concat(chunks).buffer;
+    }
+
+    const request = new Request(url, {
+      method,
+      headers: req.headers as Record<string, string>,
+      body: body ? body : undefined,
+    });
+
+    const response = await app.fetch(request);
+
+    res.statusCode = response.status;
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+
+    const responseBody = await response.text();
+    res.end(responseBody);
   });
 
-  const response = await app.fetch(request);
-
-  res.statusCode = response.status;
-  response.headers.forEach((value, key) => {
-    res.setHeader(key, value);
+  server.listen(port, () => {
+    console.log(`\n✓ Server running at http://localhost:${port}`);
+    console.log(`  → API docs: http://localhost:${port}/`);
+    console.log(`  → Health: http://localhost:${port}/health\n`);
   });
+}
 
-  const responseBody = await response.text();
-  res.end(responseBody);
-});
-
-server.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
+startServer().catch(console.error);

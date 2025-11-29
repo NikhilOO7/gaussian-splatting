@@ -10,8 +10,10 @@ export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<PDFContent>
   try {
     const data = await pdfParse(pdfBuffer);
 
+    const cleanedText = cleanExtractedText(data.text);
+
     return {
-      text: data.text,
+      text: cleanedText,
       numPages: data.numpages,
       info: data.info,
     };
@@ -21,33 +23,168 @@ export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<PDFContent>
   }
 }
 
-export async function fetchAndExtractPDF(url: string): Promise<PDFContent> {
-  try {
-    const response = await fetch(url);
+function cleanExtractedText(text: string): string {
+  let cleaned = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
-    }
+  cleaned = cleaned.replace(/([a-z])-\n([a-z])/g, '$1$2');
 
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
-    return await extractTextFromPDF(buffer);
-  } catch (error) {
-    console.error('Error fetching and extracting PDF:', error);
-    throw new Error(`Failed to fetch and extract PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
+  cleaned = cleaned.replace(/[ \t]+/g, ' ');
+
+  cleaned = cleaned.replace(/[^\x20-\x7E\n]/g, ' ');
+
+  return cleaned.trim();
 }
 
-export function chunkText(text: string, chunkSize: number = 2000, overlap: number = 200): string[] {
-  const chunks: string[] = [];
-  let start = 0;
+export async function fetchAndExtractPDF(url: string, retries: number = 3): Promise<PDFContent> {
+  let lastError: Error | null = null;
 
-  while (start < text.length) {
-    const end = Math.min(start + chunkSize, text.length);
-    chunks.push(text.substring(start, end));
-    start = end - overlap;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`Fetching PDF (attempt ${attempt}/${retries}): ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; KnowledgeGraphBot/1.0)',
+          'Accept': 'application/pdf',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && !contentType.includes('pdf') && !contentType.includes('octet-stream')) {
+        console.warn(`Unexpected content type: ${contentType}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      if (buffer.length < 1000) {
+        throw new Error('PDF file too small, likely an error page');
+      }
+
+      console.log(`Downloaded ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
+
+      return await extractTextFromPDF(buffer);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`Attempt ${attempt} failed:`, lastError.message);
+
+      if (attempt < retries) {
+        const delay = Math.pow(2, attempt) * 1000;
+        console.log(`Retrying in ${delay / 1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw new Error(`Failed to fetch and extract PDF after ${retries} attempts: ${lastError?.message}`);
+}
+
+export function chunkText(
+  text: string, 
+  chunkSize: number = 2000, 
+  overlap: number = 200
+): string[] {
+  if (!text || text.length === 0) {
+    return [];
+  }
+
+  const chunks: string[] = [];
+  const paragraphs = text.split(/\n\n+/);
+  
+  let currentChunk = '';
+  
+  for (const paragraph of paragraphs) {
+    if (currentChunk.length + paragraph.length + 2 <= chunkSize) {
+      currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+    } else {
+      if (currentChunk) {
+        chunks.push(currentChunk.trim());
+      }
+      
+      if (paragraph.length > chunkSize) {
+        const words = paragraph.split(' ');
+        currentChunk = '';
+        for (const word of words) {
+          if (currentChunk.length + word.length + 1 <= chunkSize) {
+            currentChunk += (currentChunk ? ' ' : '') + word;
+          } else {
+            if (currentChunk) {
+              chunks.push(currentChunk.trim());
+            }
+            currentChunk = word;
+          }
+        }
+      } else {
+        currentChunk = paragraph;
+      }
+    }
+  }
+  
+  if (currentChunk) {
+    chunks.push(currentChunk.trim());
+  }
+
+  if (overlap > 0 && chunks.length > 1) {
+    const overlappedChunks: string[] = [chunks[0]];
+    
+    for (let i = 1; i < chunks.length; i++) {
+      const prevChunk = chunks[i - 1];
+      const overlapText = prevChunk.slice(-overlap);
+      overlappedChunks.push(overlapText + '\n\n' + chunks[i]);
+    }
+    
+    return overlappedChunks;
   }
 
   return chunks;
+}
+
+export function detectSection(text: string, chunkIndex: number, totalChunks: number): string {
+  const lowerText = text.toLowerCase().slice(0, 500);
+
+  if (chunkIndex === 0) {
+    return 'abstract';
+  }
+
+  if (lowerText.includes('introduction') || lowerText.includes('1 introduction') || lowerText.includes('1. introduction')) {
+    return 'introduction';
+  }
+
+  if (lowerText.includes('related work') || lowerText.includes('background') || lowerText.includes('prior work')) {
+    return 'related_work';
+  }
+
+  if (lowerText.includes('method') || lowerText.includes('approach') || lowerText.includes('our model')) {
+    return 'methods';
+  }
+
+  if (lowerText.includes('experiment') || lowerText.includes('evaluation') || lowerText.includes('results')) {
+    return 'results';
+  }
+
+  if (lowerText.includes('conclusion') || lowerText.includes('discussion') || lowerText.includes('future work')) {
+    return 'conclusion';
+  }
+
+  if (lowerText.includes('reference') || lowerText.includes('bibliography')) {
+    return 'references';
+  }
+
+  if (chunkIndex < totalChunks * 0.2) {
+    return 'introduction';
+  } else if (chunkIndex < totalChunks * 0.6) {
+    return 'methods';
+  } else if (chunkIndex < totalChunks * 0.85) {
+    return 'results';
+  } else {
+    return 'conclusion';
+  }
 }
