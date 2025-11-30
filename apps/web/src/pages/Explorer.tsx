@@ -41,22 +41,33 @@ export default function Explorer() {
     return colors[type] || '#6b7280';
   };
 
+  // Improved layout algorithm - spread nodes in a circle with more spacing
   const nodes =
-    nodesData?.nodes.map((node, index) => ({
-      id: node.id,
-      data: { label: node.name },
-      position: { x: (index % 5) * 200, y: Math.floor(index / 5) * 100 },
-      style: {
-        background: getNodeColor(node.type),
-        color: '#fff',
-        padding: 10,
-        borderRadius: 8,
-        fontSize: 14,
-        fontWeight: 600,
-        border: '2px solid rgba(255,255,255,0.2)',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-      },
-    })) || [];
+    nodesData?.nodes.map((node, index) => {
+      const total = nodesData.nodes.length;
+      const radius = Math.max(400, total * 15); // Dynamic radius based on node count
+      const angle = (index / total) * 2 * Math.PI;
+      const x = Math.cos(angle) * radius + 600; // Center at 600, 400
+      const y = Math.sin(angle) * radius + 400;
+
+      return {
+        id: node.id,
+        data: { label: node.name },
+        position: { x, y },
+        style: {
+          background: getNodeColor(node.type),
+          color: '#fff',
+          padding: 10,
+          borderRadius: 8,
+          fontSize: 12,
+          fontWeight: 600,
+          border: '2px solid rgba(255,255,255,0.2)',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          minWidth: 120,
+          textAlign: 'center' as const,
+        },
+      };
+    }) || [];
 
   const edges =
     edgesData?.edges.map((edge) => ({

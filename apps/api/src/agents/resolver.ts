@@ -12,8 +12,8 @@ export interface ResolvedEntity {
 }
 
 export interface ResolvedRelationship {
-  sourceId: string;
-  targetId: string;
+  sourceName: string;  // Canonical entity name (NOT UUID)
+  targetName: string;  // Canonical entity name (NOT UUID)
   type: string;
   confidence: number;
   evidence: string;

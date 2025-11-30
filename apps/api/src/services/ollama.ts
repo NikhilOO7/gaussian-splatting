@@ -33,6 +33,44 @@ export async function generateCompletion(
   temperature: number = 0.7
 ): Promise<OllamaResponse> {
   try {
+    // Use OpenAI directly via fetch for reliability
+    if (provider === 'openai') {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiApiKey}`,
+        },
+        body: JSON.stringify({
+          model: openaiModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature,
+          max_tokens: 16384,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`OpenAI API error: ${response.status} ${error}`);
+      }
+
+      const data: any = await response.json();
+      const text = data.choices[0]?.message?.content || '';
+
+      return {
+        text,
+        usage: data.usage ? {
+          promptTokens: data.usage.prompt_tokens,
+          completionTokens: data.usage.completion_tokens,
+          totalTokens: data.usage.total_tokens,
+        } : undefined,
+      };
+    }
+
+    // Fallback to AI SDK for Ollama
     const result = await generateText({
       model: getModel() as any,
       messages: [

@@ -27,17 +27,23 @@ Return your response as valid JSON with this structure:
 {
   "accepted": [
     {
-      "sourceId": "uuid",
-      "targetId": "uuid",
-      "type": "relationship type",
-      "confidence": number,
-      "evidence": "text"
+      "sourceName": "ViLoMem",
+      "targetName": "MathVision",
+      "type": "evaluates_on",
+      "confidence": 0.9,
+      "evidence": "text from paper"
     }
   ],
   "rejected": [
     {
-      "relationship": {...},
-      "reason": "explanation"
+      "relationship": {
+        "sourceName": "...",
+        "targetName": "...",
+        "type": "...",
+        "confidence": 0.3,
+        "evidence": "..."
+      },
+      "reason": "explanation for rejection"
     }
   ],
   "confidenceAdjustments": [
@@ -48,7 +54,9 @@ Return your response as valid JSON with this structure:
       "reason": "explanation"
     }
   ]
-}`;
+}
+
+CRITICAL: Use "sourceName" and "targetName" (entity names like "ViLoMem"), NOT "sourceId" or "targetId".`;
 
 export function createValidationUserPrompt(
   resolvedData: any,

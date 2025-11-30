@@ -47,10 +47,26 @@ export async function processPaper(paperId: string): Promise<ProcessingStats> {
     const chunks = chunkText(paper.rawText, 2000, 200);
     console.log(`Split into ${chunks.length} chunks`);
 
+    // Update status to extracting_entities
+    await db
+      .update(papers)
+      .set({
+        processingStatus: 'extracting_entities',
+        processingProgress: 0
+      })
+      .where(eq(papers.id, paperId));
+
     const entityMap = new Map<string, string>();
 
     for (let i = 0; i < chunks.length; i++) {
       console.log(`\n--- Processing chunk ${i + 1}/${chunks.length} ---`);
+
+      // Update progress after each chunk
+      const progress = Math.floor((i / chunks.length) * 100);
+      await db
+        .update(papers)
+        .set({ processingProgress: progress })
+        .where(eq(papers.id, paperId));
       
       const section = detectSection(chunks[i], i, chunks.length);
       console.log(`Detected section: ${section}`);
@@ -79,6 +95,12 @@ export async function processPaper(paperId: string): Promise<ProcessingStats> {
 
         const resolverOutput = await resolveEntities(extractorOutput, existingNodes);
         console.log(`Resolved ${resolverOutput.resolvedEntities.length} entities`);
+        if (resolverOutput.resolvedRelationships.length > 0) {
+          console.log(`Resolved ${resolverOutput.resolvedRelationships.length} relationships:`);
+          resolverOutput.resolvedRelationships.forEach(rel => {
+            console.log(`  ${rel.sourceName} --[${rel.type}]--> ${rel.targetName}`);
+          });
+        }
 
         for (const entity of resolverOutput.resolvedEntities) {
           if (entity.isNew && !entityMap.has(entity.canonicalName.toLowerCase())) {
@@ -127,13 +149,18 @@ export async function processPaper(paperId: string): Promise<ProcessingStats> {
 
         for (const relationship of validationOutput.accepted) {
           try {
-            const sourceId = entityMap.get(relationship.sourceId?.toLowerCase()) || 
-                            findEntityId(entityMap, relationship.sourceId);
-            const targetId = entityMap.get(relationship.targetId?.toLowerCase()) ||
-                            findEntityId(entityMap, relationship.targetId);
+            // Relationships have canonical entity NAMES, not UUIDs
+            // Look them up in entityMap which maps canonicalName.toLowerCase() -> UUID
+            const sourceId = entityMap.get(relationship.sourceName?.toLowerCase()) ||
+                            findEntityId(entityMap, relationship.sourceName);
+            const targetId = entityMap.get(relationship.targetName?.toLowerCase()) ||
+                            findEntityId(entityMap, relationship.targetName);
 
             if (!sourceId || !targetId) {
-              console.warn(`Could not find node IDs for relationship: ${relationship.sourceId} -> ${relationship.targetId}`);
+              console.warn(`Could not find node IDs for relationship:`);
+              console.warn(`  Source: "${relationship.sourceName}" -> ${sourceId || 'NOT FOUND'}`);
+              console.warn(`  Target: "${relationship.targetName}" -> ${targetId || 'NOT FOUND'}`);
+              console.warn(`  Available entities in map: ${Array.from(entityMap.keys()).join(', ')}`);
               continue;
             }
 
@@ -176,7 +203,12 @@ export async function processPaper(paperId: string): Promise<ProcessingStats> {
 
     await db
       .update(papers)
-      .set({ processed: true, updatedAt: new Date() })
+      .set({
+        processed: true,
+        processingStatus: 'completed',
+        processingProgress: 100,
+        updatedAt: new Date()
+      })
       .where(eq(papers.id, paperId));
 
     console.log(`\n${'='.repeat(60)}`);

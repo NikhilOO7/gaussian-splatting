@@ -13,11 +13,11 @@
   "dependencies": {
     "@ai-sdk/openai": "^2.0.74",
     "@hono/node-server": "^1.19.6",
-    "ai": "3.4.33",
+    "ai": "5.0.104",
     "dotenv": "^17.2.3",
     "drizzle-orm": "latest",
     "hono": "latest",
-    "ollama-ai-provider": "0.15.2",
+    "ollama-ai-provider": "1.2.0",
     "pdf-parse": "latest",
     "postgres": "latest",
     "zod": "latest"

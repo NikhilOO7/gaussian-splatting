@@ -34,14 +34,20 @@ Return your response as valid JSON with this structure:
   ],
   "resolvedRelationships": [
     {
-      "sourceId": "canonical entity id",
-      "targetId": "canonical entity id",
-      "type": "relationship type",
-      "confidence": number,
-      "evidence": "evidence text"
+      "sourceName": "ViLoMem",
+      "targetName": "dual-stream memory",
+      "type": "uses",
+      "confidence": 0.9,
+      "evidence": "ViLoMem uses dual-stream memory architecture"
     }
   ]
-}`;
+}
+
+CRITICAL RULES:
+1. Use "sourceName" and "targetName" fields (NOT "sourceId" or "targetId")
+2. These must be CANONICAL ENTITY NAMES like "ViLoMem", "GPT-4", "MathVision"
+3. NEVER use UUIDs, database IDs, or null values
+4. Both sourceName and targetName must match entity names from resolvedEntities`;
 
 export function createResolutionUserPrompt(
   extractedData: any,

@@ -125,16 +125,23 @@ papersRouter.post('/:id/process', async (c) => {
       }, 400);
     }
 
+    // Allow reprocessing if paper previously failed (no entities created)
     if (paper.processed) {
-      return c.json({
-        message: 'Paper already processed',
-        paperId: id,
-        status: 'already_processed'
-      });
+      console.log(`Paper already marked as processed. Allowing reprocessing...`);
     }
 
     console.log(`Starting processing for paper: ${paper.title}`);
-    
+
+    // Reset paper status before processing
+    await db
+      .update(papers)
+      .set({
+        processed: false,
+        processingStatus: 'pending',
+        processingProgress: 0
+      })
+      .where(eq(papers.id, id));
+
     await processPaper(id);
 
     return c.json({

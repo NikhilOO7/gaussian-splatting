@@ -587,3 +587,19 @@ curl http://localhost:3000/api/ingest/seed/gaussian-splatting
 | `/api/ingest/bulk` | POST | Bulk ingest papers |
 | `/api/ingest/status/:jobId` | GET | Check ingestion status |
 | `/api/ingest/seed/gaussian-splatting` | GET | Get seed paper IDs |
+
+
+## Limitations and Future Work
+
+### Current Implementation
+- **Polling-based status updates**: Frontend polls `/api/papers/processing` every 2 seconds
+- Works well for development and light usage
+- Simple implementation using React Query's `refetchInterval`
+
+### Production Improvements
+1. **Smart Polling** (quick win): Reduce poll frequency to 30s when no papers processing
+2. **Server-Sent Events** (recommended): Push-based updates for real-time status with minimal overhead
+3. **WebSocket fallback**: For browsers without SSE support
+
+**Trade-off:** Current polling was chosen for simplicity in a take-home assignment context. 
+For 100+ concurrent users, SSE would reduce database load by ~95% while providing faster updates.
