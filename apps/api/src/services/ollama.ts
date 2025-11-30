@@ -1,8 +1,12 @@
 import { generateText } from 'ai';
 import { ollama } from 'ollama-ai-provider';
+import { openai } from '@ai-sdk/openai';
 
+const provider = process.env.LLM_PROVIDER || 'ollama'; // 'ollama' or 'openai'
 const baseURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-const model = process.env.OLLAMA_MODEL || 'llama3.1:8b';
+const ollamaModel = process.env.OLLAMA_MODEL || 'llama3.2:1b';
+const openaiModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const openaiApiKey = process.env.OPENAI_API_KEY;
 
 export interface OllamaResponse {
   text: string;
@@ -13,6 +17,16 @@ export interface OllamaResponse {
   };
 }
 
+function getModel() {
+  if (provider === 'openai') {
+    if (!openaiApiKey) {
+      throw new Error('OPENAI_API_KEY not set in environment variables');
+    }
+    return openai(openaiModel);
+  }
+  return ollama(ollamaModel);
+}
+
 export async function generateCompletion(
   systemPrompt: string,
   userPrompt: string,
@@ -20,13 +34,13 @@ export async function generateCompletion(
 ): Promise<OllamaResponse> {
   try {
     const result = await generateText({
-      model: ollama(model, { baseURL }),
+      model: getModel() as any,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
       temperature,
-      maxTokens: 4096,
+      maxTokens: 16384,
     });
 
     return {
@@ -39,11 +53,11 @@ export async function generateCompletion(
     };
   } catch (error) {
     console.error('Error generating completion:', error);
-    
+
     if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
       throw new Error('Ollama server not running. Start it with: ollama serve');
     }
-    
+
     throw new Error(`Failed to generate completion: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -120,6 +134,8 @@ function parseJSONResponse<T>(text: string): T {
       }
     }
 
+    console.error('Raw LLM response:', text.substring(0, 500));
+    console.error('Cleaned JSON text:', jsonText.substring(0, 500));
     throw new Error(`Failed to parse JSON: ${e instanceof Error ? e.message : 'Unknown error'}`);
   }
 }
@@ -137,22 +153,26 @@ function getEmptyResult<T>(): T {
 }
 
 export async function checkOllamaConnection(): Promise<boolean> {
+  if (provider === 'openai') {
+    return !!openaiApiKey;
+  }
+
   try {
     const response = await fetch(`${baseURL}/api/tags`);
     if (!response.ok) {
       return false;
     }
-    
-    const data = await response.json();
-    const hasModel = data.models?.some((m: any) => 
-      m.name === model || m.name.startsWith(model.split(':')[0])
+
+    const data: any = await response.json();
+    const hasModel = data.models?.some((m: any) =>
+      m.name === ollamaModel || m.name.startsWith(ollamaModel.split(':')[0])
     );
-    
+
     if (!hasModel) {
-      console.warn(`Model ${model} not found. Available models:`, 
+      console.warn(`Model ${ollamaModel} not found. Available models:`,
         data.models?.map((m: any) => m.name).join(', '));
     }
-    
+
     return true;
   } catch (error) {
     return false;
@@ -160,14 +180,15 @@ export async function checkOllamaConnection(): Promise<boolean> {
 }
 
 export async function warmupModel(): Promise<void> {
-  console.log('Warming up Ollama model...');
+  const modelName = provider === 'openai' ? openaiModel : ollamaModel;
+  console.log(`Warming up ${provider} model (${modelName})...`);
   try {
     await generateCompletion(
       'You are a helpful assistant.',
       'Say "ready" in one word.',
       0.1
     );
-    console.log('Ollama model warmed up successfully');
+    console.log(`${provider} model warmed up successfully`);
   } catch (error) {
     console.error('Failed to warm up model:', error);
   }
