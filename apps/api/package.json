@@ -12,10 +12,10 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",
-    "ai": "latest",
+    "ai": "3.4.33",
     "drizzle-orm": "latest",
     "hono": "latest",
-    "ollama-ai-provider": "latest",
+    "ollama-ai-provider": "0.15.2",
     "pdf-parse": "latest",
     "postgres": "latest",
     "zod": "latest"

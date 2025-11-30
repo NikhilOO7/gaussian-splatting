@@ -71,7 +71,7 @@ ingestRouter.post('/arxiv', async (c) => {
     }
 
     const cleanId = arxivId.replace('arXiv:', '').trim();
-    
+
     const existing = await db
       .select()
       .from(papers)
@@ -79,7 +79,7 @@ ingestRouter.post('/arxiv', async (c) => {
       .limit(1);
 
     if (existing.length > 0) {
-      return c.json({ 
+      return c.json({
         error: 'Paper already exists',
         paperId: existing[0].id,
         status: 'duplicate'

@@ -1,7 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { useState } from 'react';
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
+  const [processingPaperId, setProcessingPaperId] = useState<string | null>(null);
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['graph-stats'],
     queryFn: () => api.graph.stats(),
@@ -16,6 +20,19 @@ export default function Dashboard() {
     queryKey: ['processing-papers'],
     queryFn: () => api.papers.processing(),
     refetchInterval: 2000,
+  });
+
+  const processMutation = useMutation({
+    mutationFn: (paperId: string) => api.papers.process(paperId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['processing-papers'] });
+      queryClient.invalidateQueries({ queryKey: ['papers'] });
+      setProcessingPaperId(null);
+    },
+    onError: (error) => {
+      console.error('Error processing paper:', error);
+      setProcessingPaperId(null);
+    },
   });
 
   if (isLoading) {
@@ -147,6 +164,9 @@ export default function Dashboard() {
 
               const status = statusConfig[paper.processingStatus] || statusConfig.pending;
 
+              const isPending = paper.processingStatus === 'pending';
+              const isProcessing = processingPaperId === paper.id;
+
               return (
                 <div key={paper.id} className="bg-white rounded-xl border border-orange-200/60 p-5 hover:shadow-md transition-all duration-200">
                   <div className="flex items-start justify-between mb-3">
@@ -158,9 +178,39 @@ export default function Dashboard() {
                         </span>
                       )}
                     </div>
-                    <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold ml-3 flex-shrink-0 bg-${status.color}-100 text-${status.color}-800 border-2 border-${status.color}-200`}>
-                      <span>{status.icon}</span>
-                      <span>{status.label}</span>
+                    <div className="flex items-center space-x-2 ml-3 flex-shrink-0">
+                      {isPending && (
+                        <button
+                          onClick={() => {
+                            setProcessingPaperId(paper.id);
+                            processMutation.mutate(paper.id);
+                          }}
+                          disabled={isProcessing}
+                          className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-bold rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center space-x-1"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>Processing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>Process Now</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                      <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-${status.color}-100 text-${status.color}-800 border-2 border-${status.color}-200`}>
+                        <span>{status.icon}</span>
+                        <span>{status.label}</span>
+                      </div>
                     </div>
                   </div>
 

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { createServer, IncomingMessage, ServerResponse } from 'node:http';
+import { serve } from '@hono/node-server';
 import { papersRouter } from './routes/papers';
 import { graphRouter } from './routes/graph';
 import { ingestRouter } from './routes/ingest';
@@ -84,7 +84,7 @@ async function startServer() {
   console.log('========================================\n');
 
   console.log('Checking services...');
-  
+
   const ollamaConnected = await checkOllamaConnection();
   if (ollamaConnected) {
     console.log('✓ Ollama: Connected');
@@ -96,40 +96,13 @@ async function startServer() {
     console.log('  → The API will still work, but processing will fail\n');
   }
 
-  const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    const url = `http://${req.headers.host}${req.url}`;
-    const method = req.method || 'GET';
+  console.log(`\n✓ Server running at http://localhost:${port}`);
+  console.log(`  → API docs: http://localhost:${port}/`);
+  console.log(`  → Health: http://localhost:${port}/health\n`);
 
-    let body: ArrayBuffer | undefined;
-    if (method !== 'GET' && method !== 'HEAD') {
-      const chunks: Buffer[] = [];
-      for await (const chunk of req) {
-        chunks.push(chunk);
-      }
-      body = Buffer.concat(chunks).buffer;
-    }
-
-    const request = new Request(url, {
-      method,
-      headers: req.headers as Record<string, string>,
-      body: body ? body : undefined,
-    });
-
-    const response = await app.fetch(request);
-
-    res.statusCode = response.status;
-    response.headers.forEach((value, key) => {
-      res.setHeader(key, value);
-    });
-
-    const responseBody = await response.text();
-    res.end(responseBody);
-  });
-
-  server.listen(port, () => {
-    console.log(`\n✓ Server running at http://localhost:${port}`);
-    console.log(`  → API docs: http://localhost:${port}/`);
-    console.log(`  → Health: http://localhost:${port}/health\n`);
+  serve({
+    fetch: app.fetch,
+    port,
   });
 }
 

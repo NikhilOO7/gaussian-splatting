@@ -72,10 +72,10 @@ export const api = {
   },
 
   ingest: {
-    arxiv: (arxivId: string) =>
+    arxiv: (arxivId: string, autoProcess = true) =>
       fetchAPI<{ jobId: string; status: string }>('/api/ingest/arxiv', {
         method: 'POST',
-        body: JSON.stringify({ arxivId }),
+        body: JSON.stringify({ arxivId, autoProcess }),
       }),
     status: (jobId: string) =>
       fetchAPI<{ status: string; paperId?: string; error?: string }>(
