@@ -202,36 +202,6 @@ The application will be available at:
 - **6 relationships** rejected by validator (temporal/type mismatches)
 - Average processing time: ~3-5 minutes per paper
 
-### Critical Bug Fixes
-
-**Issue #1: Field Name Mismatch in Agent Pipeline** (Resolved ✅)
-
-**Problem**: Only 5 edges were being created despite extracting 20+ relationships. The validator was converting field names from `sourceName`/`targetName` back to `sourceId`/`targetId`, causing the processor to receive `undefined` values.
-
-**Root Cause**: Inconsistent field names across agent prompts:
-- Resolver output: `sourceName`, `targetName` (correct)
-- Validator prompt: Asked for `sourceId`, `targetId` (wrong)
-- Processor: Expected `sourceName`, `targetName` (correct)
-
-**Solution**:
-1. Updated [validator.ts:14-20](apps/api/src/agents/validator.ts#L14-L20) interface to use `sourceName`/`targetName`
-2. Updated [validation.ts:28-36](apps/api/src/agents/prompts/validation.ts#L28-L36) prompt schema with correct field names
-3. Updated [resolution.ts:35-43](apps/api/src/agents/prompts/resolution.ts#L35-L43) prompt with "CRITICAL RULES" section
-4. Updated [processor.ts:132-143](apps/api/src/pipeline/processor.ts#L132-L143) to use correct field names with enhanced logging
-
-**Result**: Edge creation increased from 5 to 25 (5x improvement)
-
-**Issue #2: Cluttered Graph Visualization** (Resolved ✅)
-
-**Problem**: Simple grid layout caused overlapping nodes that were difficult to read.
-
-**Solution**: Implemented circular layout algorithm in [Explorer.tsx:44-70](apps/web/src/pages/Explorer.tsx#L44-L70):
-- Dynamic radius based on node count: `radius = Math.max(400, total * 15)`
-- Trigonometric distribution: `x = Math.cos(angle) * radius + 600`
-- Even spacing with `angle = (index / total) * 2 * Math.PI`
-
-**Result**: Clean, readable graph visualization with no overlapping nodes
-
 ### Key Implementation Details
 
 **Entity Name Resolution Flow**:
