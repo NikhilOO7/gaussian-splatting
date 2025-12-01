@@ -53,19 +53,19 @@ A full-stack knowledge graph application that extracts structured relationships 
 
 The dashboard displays live statistics from the PostgreSQL database, including node/edge counts by type and processing status for papers currently being analyzed.
 
-![Dashboard](screenshots/Screenshot%202025-11-30%20at%204.39.00%20AM.png)
+![Dashboard](./screenshots/Screenshot%202025-11-30%20at%204.39.00%20AM.png)
 
 ### Graph Explorer - Interactive Visualization
 
 The graph explorer shows nodes and edges extracted from real papers using the AI agent pipeline. The circular layout ensures clean visualization without overlapping nodes.
 
-![Graph Explorer](screenshots/Screenshot%202025-11-30%20at%204.40.12%20AM.png)
+![Graph Explorer](./screenshots/Screenshot%202025-11-30%20at%204.40.12%20AM.png)
 
 ### Paper Ingestion - arXiv Integration
 
 Papers can be ingested directly from arXiv by ID. The system automatically downloads PDFs, extracts text, and processes through the 3-agent pipeline with real-time progress updates.
 
-![Paper Ingestion](screenshots/Screenshot%202025-11-30%20at%204.40.37%20AM.png)
+![Paper Ingestion](./screenshots/Screenshot%202025-11-30%20at%204.40.37%20AM.png)
 
 ## Tech Stack
 
